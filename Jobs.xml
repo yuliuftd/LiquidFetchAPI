@@ -87,10 +87,12 @@
                 </filter>
             {% endif %}
 
-            {% unless includeAll %}
-                <condition attribute="statecode" operator="eq" value="0">
-                </condition>
-            {% endunless %}
+            {% if includeAll %}
+                <filter type="or">
+                    <condition attribute="statecode" operator="eq" value="0" />
+                    <condition attribute="statecode" operator="eq" value="1" />
+                </filter>
+            {% endif %}
         </filter>
     </entity>
 </fetch>
@@ -158,17 +160,18 @@
                 </filter>
             {% endif %}
 
-            {% unless includeAll %}
-                <condition attribute="statecode" operator="eq" value="0">
-                </condition>
-            {% endunless %}
+            {% if includeAll %}
+                <filter type="or">
+                    <condition attribute="statecode" operator="eq" value="0" />
+                    <condition attribute="statecode" operator="eq" value="1" />
+                </filter>
+            {% endif %}
 
         </filter>
     </entity>
 </fetch>
 
 {% endfetchxml %}
-
 
 {% if getTotalJobs.results.entities.size > 0 %}
   {

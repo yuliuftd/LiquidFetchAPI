@@ -282,15 +282,6 @@
                     </filter>
                 {% endif %}
 
-                {% if includeArc %}
-                    <filter type="or">
-                        <condition attribute="statecode" operator="eq" value="0" />
-                        <condition attribute="statecode" operator="eq" value="1" />
-                    </filter>
-                {% else %}
-                    <condition attribute="statecode" operator="eq" value="0" />
-                {% endif %}
-
             </filter>
         </entity>
     </fetch>
