@@ -1,0 +1,349 @@
+{% assign filterByTitle = request.params['filterByTitle'] %}
+{% assign filterByQuarry = request.params['quarryId'] %}
+{% assign quarries = filterByQuarry | split: "," %}
+
+{% assign filterByTime = request.params['filterByTime'] %}
+{% assign createdTimes = filterByTime | split: "," %}
+
+{% assign filterByStatus = request.params['status'] %}
+{% assign status = filterByStatus | split: "," %}
+
+{% assign sortByTime = request.params['sortByTime'] | default: true %}
+{% assign sortByStatus = request.params['sortByStatus'] | default: true %}
+
+{% assign jobId = request.params['jobId'] %}
+
+
+{% assign jobArchiveId = request.params['jobArchiveId'] %}
+
+{% assign driverId = request.params['driverId'] %}
+
+{% assign includeArc = request.params['includeArc'] | boolean | default: false %}
+
+{% if request.params['title'] == "Driver" or request.params['title'] == "Docket" %}
+    {% assign contactId = "59ea0360-93fb-ed11-8f6d-00224892b34a" %}
+{% endif %}
+
+
+{% fetchxml getDockets %}
+
+<fetch version="1.0" output-format="xml-platform" mapping="logical" distinct="false" page="{{ request.params['page'] | default:1 }}" count="{{ request.params['pagesize'] | default:10 }}" >
+    <entity name="socoro_docket">
+        <attribute name="socoro_docketid" />    
+        <attribute name="socoro_name" />
+        <attribute name="socoro_docket_ton" />
+        <attribute name="socoro_docketstatus" />
+        <attribute name="socoro_docket_value" />
+        <attribute name="socoro_subcontractorrate" />
+        <attribute name="socoro_dlv_addr" />
+        <attribute name="socoro_dlv_note" />
+        <attribute name="socoro_truckid" />
+        <attribute name="socoro_name" />
+        <attribute name="socoro_dlv_date" />
+        <attribute name="createdon" />
+        <attribute name="statecode" />
+
+        <order attribute="createdon" descending="{{ sortByTime }}" />
+
+        <link-entity name="socoro_driver" from="socoro_driverid" to="socoro_driver_id" alias="dd">
+            <attribute name="socoro_name" />
+            <attribute name="socoro_driverid" />
+
+            {% if contactId %}
+                <link-entity name="contact" from="contactid" to="socoro_contactid" link-type="inner" alias="dc">
+                    <attribute name="contactid" />
+                    <filter type="and">
+                        <condition attribute="contactid" operator="eq" value="{{ contactId }}" />
+                    </filter>
+                </link-entity>
+            {% endif %}
+        </link-entity>
+
+        <link-entity name="socoro_job_detail" from="socoro_job_detailid" to="socoro_jd_id" alias="djd">
+            <attribute name="socoro_name" />
+            <attribute name="socoro_job_detailid" />
+            <attribute name="socoro_remain_tonn" />
+            
+            <link-entity name="socoro_product" from="socoro_productid" to="socoro_prod_id" alias="djdp">
+                <attribute name="socoro_name" />
+                <attribute name="socoro_description" />
+                <attribute name="socoro_prod_px_per_ton" />
+
+                <link-entity name="socoro_quarry" from="socoro_quarryid" to="socoro_quarryid" alias="djdpq">
+                    <attribute name="socoro_quarryid" />                    
+                    <attribute name="socoro_quarry_name" />
+                </link-entity>
+            </link-entity>
+
+            <link-entity name="socoro_job" from="socoro_jobid" to="socoro_job_id" link-type="inner" alias="jdj">
+                <attribute name="socoro_jobid" />
+                <attribute name="socoro_total_remind_ton" />
+                <attribute name="socoro_name" />
+                <attribute name="socoro_po_num" />
+                <attribute name="createdon" />
+
+                <link-entity name="account" from="accountid" to="socoro_acct_id" link-type="inner" alias="jda">
+                    <attribute name="name" />
+                </link-entity>
+
+                {% if jobId %}
+                    <filter type="and">
+                        <condition attribute="socoro_jobid" operator="eq" value="{{ jobId }}">
+                        </condition>
+                    </filter>
+                {% elsif jobArchiveId %}
+                    <filter type="and">
+                        <condition attribute="socoro_jobid" operator="eq" value="{{ jobArchiveId }}">
+                        </condition>
+                    </filter>
+                {% endif %}
+            </link-entity>
+        </link-entity>
+
+        <filter type="and">
+            {% if filterByTitle %}
+                <filter type="or">
+                    <condition attribute="socoro_name" operator="like" value="%{{ filterByTitle }}%" />
+                    <condition attribute="socoro_name" entityname="dd" operator="like" value="%{{ filterByTitle }}%" />
+                    <condition attribute="socoro_name" entityname="djdp" operator="like" value="%{{ filterByTitle }}%" />
+                </filter>
+            {% endif %}
+
+            {% if driverId %}
+                <filter type="and">
+                    <condition attribute="socoro_docketstatus" operator="eq" value="1" />            
+                    <condition attribute="socoro_driverid" entityname="dd" operator="eq" value="{{ driverId }}" />
+                </filter>
+            {% endif %}
+
+
+            {% if request.params['title'] == "Docket" %}
+                <filter type="and">
+                    <condition attribute="socoro_docketstatus" operator="eq" value="1" />            
+                </filter>
+            {% endif %}
+
+            {% if filterByStatus and includeArc %}
+                    <filter type="or">
+                        {% for status in status %}
+                                <condition attribute="socoro_docketstatus" operator="eq" value="{{ status }}" />
+                        {% endfor %}
+                        <condition attribute="statecode" operator="eq" value="1" />
+                    </filter>
+            {% elsif filterByStatus %}
+                    <filter type="or">
+                        {% for status in status %}
+                                <condition attribute="socoro_docketstatus" operator="eq" value="{{ status }}" />
+                        {% endfor %}
+                    </filter>
+            {% elsif includeArc %}
+                    <condition attribute="statecode" operator="eq" value="1" />
+            {% else %}
+                    <condition attribute="statecode" operator="eq" value="0" />                    
+            {% endif %}
+
+            {% if jobArchiveId %}
+                <filter type="and">
+                    <condition attribute="socoro_docketstatus" operator="ne" value="4" />
+                    <condition attribute="statecode" operator="ne" value="1" />
+                </filter>
+            {% endif %}
+
+            {% if filterByQuarry %}
+                <filter type="or">
+                    {% for quarry in quarries %}
+                        <condition attribute="socoro_quarryid" entityname="djdpq" operator="eq" value="{{ quarry }}" />
+                    {% endfor %}
+                </filter>
+            {% endif %}
+
+            {% if filterByTime and createdTimes.size == 2 %}
+                <filter type="and">
+                    <condition attribute="createdon" operator="on-or-after" value="{{ createdTimes[0] }}" />
+                    <condition attribute="createdon" operator="on-or-before" value="{{ createdTimes[1] }}" />
+                </filter>
+            {% endif %}
+            
+        </filter>
+    </entity>
+</fetch>
+
+{% endfetchxml %}
+
+{% unless contactId %}
+    {% fetchxml getAllDockets %}
+
+    <fetch version="1.0" output-format="xml-platform" mapping="logical" distinct="true" >
+        <entity name="socoro_docket">
+            <attribute name="socoro_docketid" />    
+            <attribute name="socoro_name" />
+            <attribute name="socoro_docket_ton" />
+            <attribute name="socoro_docketstatus" />
+            <attribute name="socoro_docket_value" />
+            <attribute name="socoro_name" />
+            <attribute name="createdon" />
+
+            <link-entity name="socoro_driver" from="socoro_driverid" to="socoro_driver_id" alias="dd">
+                <attribute name="socoro_name" />
+                <attribute name="socoro_driverid" />
+            </link-entity>
+
+            <link-entity name="socoro_job_detail" from="socoro_job_detailid" to="socoro_jd_id" alias="djd">
+                <attribute name="socoro_name" />
+                <attribute name="socoro_job_detailid" />
+                
+                <link-entity name="socoro_product" from="socoro_productid" to="socoro_prod_id" alias="djdp">
+                    <attribute name="socoro_name" />
+                    <attribute name="socoro_description" />
+                    <attribute name="socoro_prod_px_per_ton" />
+
+                    <link-entity name="socoro_quarry" from="socoro_quarryid" to="socoro_quarryid" alias="djdpq">
+                        <attribute name="socoro_quarryid" />                    
+                        <attribute name="socoro_quarry_name" />
+                    </link-entity>
+                </link-entity>
+
+                <link-entity name="socoro_job" from="socoro_jobid" to="socoro_job_id" link-type="inner" alias="jdj">
+                
+                    <attribute name="socoro_jobid" />
+
+                    <link-entity name="account" from="accountid" to="socoro_acct_id" link-type="inner" alias="jda">
+                        <attribute name="name" />
+                    </link-entity>
+
+                    {% if jobId %}
+                        <filter type="and">
+                            <condition attribute="socoro_jobid" operator="eq" value="{{ jobId }}">
+                            </condition>
+                        </filter>
+                    {% elsif jobArchiveId %}
+                        <filter type="and">
+                            <condition attribute="socoro_jobid" operator="eq" value="{{ jobArchiveId }}">
+                            </condition>
+                        </filter>
+                    {% endif %}
+                </link-entity>
+            </link-entity>
+
+            <filter type="and">
+                {% if filterByTitle %}
+                    <filter type="or">
+                        <condition attribute="socoro_name" operator="like" value="%{{ filterByTitle }}%" />
+                        <condition attribute="socoro_name" entityname="dd" operator="like" value="%{{ filterByTitle }}%" />
+                        <condition attribute="socoro_name" entityname="djdp" operator="like" value="%{{ filterByTitle }}%" />
+                    </filter>
+                {% endif %}
+
+                {% if driverId %}
+                    <filter type="and">
+                        <condition attribute="socoro_docketstatus" operator="eq" value="1" />            
+                        <condition attribute="socoro_driverid" entityname="dd" operator="eq" value="{{ driverId }}" />
+                    </filter>
+                {% endif %}
+
+                {% if filterByStatus and includeArc %}
+                        <filter type="or">
+                            {% for status in status %}
+                                    <condition attribute="socoro_docketstatus" operator="eq" value="{{ status }}" />
+                            {% endfor %}
+                            <condition attribute="statecode" operator="eq" value="1" />
+                        </filter>
+                {% elsif filterByStatus %}
+                        <filter type="or">
+                            {% for status in status %}
+                                    <condition attribute="socoro_docketstatus" operator="eq" value="{{ status }}" />
+                            {% endfor %}
+                        </filter>
+                {% elsif includeArc %}
+                        <condition attribute="statecode" operator="eq" value="1" />
+                {% else %}
+                        <condition attribute="statecode" operator="eq" value="0" />                    
+                {% endif %}
+
+                {% if jobArchiveId %}
+                    <filter type="and">
+                        <condition attribute="socoro_docketstatus" operator="ne" value="4" />
+                        <condition attribute="statecode" operator="ne" value="1" />
+                    </filter>
+                {% endif %}
+
+                {% if filterByQuarry %}
+                    <filter type="or">
+                        {% for quarry in quarries %}
+                            <condition attribute="socoro_quarryid" entityname="djdpq" operator="eq" value="{{ quarry }}" />
+                        {% endfor %}
+                    </filter>
+                {% endif %}
+
+                {% if filterByTime and createdTimes.size == 2 %}
+                    <filter type="and">
+                        <condition attribute="createdon" operator="on-or-after" value="{{ createdTimes[0] }}" />
+                        <condition attribute="createdon" operator="on-or-before" value="{{ createdTimes[1] }}" />
+                    </filter>
+                {% endif %}
+
+                {% if includeArc %}
+                    <filter type="or">
+                        <condition attribute="statecode" operator="eq" value="0" />
+                        <condition attribute="statecode" operator="eq" value="1" />
+                    </filter>
+                {% else %}
+                    <condition attribute="statecode" operator="eq" value="0" />
+                {% endif %}
+
+            </filter>
+        </entity>
+    </fetch>
+
+    {% endfetchxml %}
+{% endunless %}
+
+{% if getDockets.results.entities.size > 0 %}
+  {
+    "ok": true,
+    "page": {{ request.params['page'] | default: 1 }},
+    "count": "{{ getAllDockets.results.entities.size }}",
+    "results": [
+      {% for docket in getDockets.results.entities %}
+        {
+          "guid": "{{ docket.socoro_docketid }}",
+          "docketId": "{{ docket.socoro_docketid }}",
+          "docketName": "{{ docket.socoro_name | escape }}",
+          "docketTon": "{{ docket.socoro_docket_ton }}",
+          "subcontractorRate": "{{ docket.socoro_subcontractorrate }}",
+          "deliveryDate": "{{ docket.socoro_dlv_date | date_to_iso8601 }}",
+          "truckId": "{{ docket.socoro_truckid }}",
+          "clientName": "{{ docket['jda.name']}}",
+          "deliveryAddress": "{{ docket.socoro_dlv_addr }}",
+          "deliveryNote": "{{ docket.socoro_dlv_note }}",
+          "driverName": "{{ docket['dd.socoro_name'] | escape }}",
+          "driverId": "{{ docket['dd.socoro_driverid'] }}",
+          "jobGuid": "{{ docket['jdj.socoro_jobid'] }}",
+          "PONumber": "{{ docket['jdj.socoro_po_num'] }}",
+          "jobCreatedDate": "{{ docket['jdj.createdon'] | date_to_iso8601 }}",
+          "remainingTonnage": "{{ docket['jdj.socoro_total_remind_ton'] }}",
+          "remainingTonnageJobDetails": "{{ docket['djd.socoro_remain_tonn'] }}",
+          "jobName":"{{ docket['djd.socoro_name'] | escape }}",
+          "jobDetailGuid":"{{ docket['djd.socoro_job_detailid'] }}",
+          "productName":"{{ docket['djdp.socoro_name'] | escape }}",
+          "productDes":"{{ docket['djdp.socoro_description'] | strip_newlines | escape }}",
+          "productPrice":"{{ docket['djdp.socoro_prod_px_per_ton'] }}",
+          "quarryid":"{{ docket['djdpq.socoro_quarryid'] }}",
+          "quarryName":"{{ docket['djdpq.socoro_quarry_name'] | escape }}",
+          "docketStatusLabel": "{{ docket.socoro_docketstatus.label }}",
+          "docketStatusValue": "{{ docket.socoro_docketstatus.value }}",
+          "docketValue": "{{ docket.socoro_docket_value }}",
+          "createdOn": "{{ docket.createdon | date_to_iso8601}}",
+          "activeStatus": "{{ docket.statecode.label }}"
+        }
+        {% unless forloop.last %},{% endunless %}
+      {% endfor %}
+    ]
+  }
+{% else %}
+  {
+    "ok": true,
+    "message": "No data found",
+    "results": []
+  }
+{% endif %}

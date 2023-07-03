@@ -1,0 +1,210 @@
+{% assign filterByTitle = request.params['filterByTitle'] %}
+{% assign capacity = filterByTitle | integer | default: -1 %}
+
+{% assign filterByType = request.params['filterByType'] %}
+{% assign orderTypes = filterByType | split: "," %}
+
+{% assign filterByTime = request.params['filterByTime'] %}
+{% assign orderTimes = filterByTime | split: "," %}
+
+{% assign includeArc = request.params['includeArc'] | boolean | default: false %}
+
+{% assign sortByName = request.params['sortByName'] %}
+{% assign sortByValue = request.params['sortByValue'] %}
+{% assign sortByTime = request.params['sortByTime'] | default: true %}
+
+{% fetchxml getJobs %}
+
+<fetch version="1.0" output-format="xml-platform" mapping="logical" distinct="false" page="{{ request.params['page'] | default:1 }}" count="{{ request.params['pagesize'] | default:10 }}" >
+    <entity name="socoro_job">
+        <attribute name="socoro_jobid" />    
+        <attribute name="socoro_name" />
+        <attribute name="socoro_ordertype" />
+        <attribute name="socoro_job_name" />
+        <attribute name="socoro_jobstatus" />
+        <attribute name="socoro_acct_id" />
+        <attribute name="socoro_po_num" />
+        <attribute name="socoro_total_ton" />
+        <attribute name="socoro_total_value" />        
+        <attribute name="socoro_total_remind_ton" />
+        <attribute name="socoro_total_docket_num" />
+        <attribute name="socoro_dlv_addr" />
+        <attribute name="socoro_dlv_note" />
+        <attribute name="createdon" />
+        <attribute name="statecode" />        
+
+        {% if sortByValue %}
+          <order attribute="socoro_total_value" descending="{{sortByValue}}"/>
+        {% endif %} 
+        {% unless sortByName or sortByValue  %}
+          <order attribute="socoro_ordertype" descending ='false' />
+          <order attribute="createdon" descending="{{ sortByTime }}" />
+        {% endunless %}
+
+        <link-entity name="account" from="accountid" to="socoro_acct_id" link-type="inner" alias="ja">
+            <attribute name="name" />
+            {% if sortByName %}
+              <order attribute="name" descending='{{sortByName}}' />
+            {% endif %}
+        </link-entity>
+
+        <filter type="and">
+            {% if filterByTitle %}
+                <filter type="or">
+                    <condition attribute="socoro_name" operator="like" value="%{{ filterByTitle }}%" />
+                    <condition attribute="socoro_po_num" operator="like" value="%{{ filterByTitle }}%" />
+                    <condition attribute="name" operator="like" entityname='ja' value="%{{ filterByTitle }}%" />
+                    {% if capacity > 0 %}
+                    <condition attribute="socoro_total_docket_num" operator="eq" value="{{ capacity }}" />
+                    <condition attribute="socoro_total_ton" operator="eq" value="{{ capacity }}" />
+                    {% endif %}
+                </filter>
+            {% endif %}
+
+            {% if filterByType and includeArc %}
+                <filter type="or">
+                    {% for types in orderTypes %}
+                        <condition attribute="socoro_ordertype" operator="eq" value="{{ types }}" />
+                    {% endfor %}
+                    <condition attribute="statecode" operator="eq" value="1" />
+                </filter>
+            {% elsif filterByType %}
+                <filter type="or">
+                    {% for types in orderTypes %}
+                        <condition attribute="socoro_ordertype" operator="eq" value="{{ types }}" />
+                    {% endfor %}
+                </filter>
+            {% elsif includeArc %}
+                <condition attribute="statecode" operator="eq" value="1" />
+            {% else %}
+                <condition attribute="statecode" operator="eq" value="0" />            
+            {% endif %}
+
+            {% if filterByTime and orderTimes.size == 2 %}
+                <filter type="and">
+                    <condition attribute="createdon" operator="on-or-after" value="{{ orderTimes[0] }}" />
+                    <condition attribute="createdon" operator="on-or-before" value="{{ orderTimes[1] }}" />
+                </filter>
+            {% endif %}
+
+            {% unless includeAll %}
+                <condition attribute="statecode" operator="eq" value="0">
+                </condition>
+            {% endunless %}
+        </filter>
+    </entity>
+</fetch>
+
+{% endfetchxml %}
+
+{% fetchxml getTotalJobs %}
+
+<fetch version="1.0" output-format="xml-platform" mapping="logical" distinct="false" >
+    <entity name="socoro_job">
+        <attribute name="socoro_jobid" />
+        <attribute name="socoro_name" />
+        <attribute name="socoro_ordertype" />
+        <attribute name="socoro_job_name" />
+        <attribute name="socoro_jobstatus" />
+        <attribute name="socoro_acct_id" />
+        <attribute name="socoro_po_num" />        
+        <attribute name="socoro_total_ton" />
+        <attribute name="socoro_total_value" />
+        <attribute name="socoro_total_remind_ton" />
+        <attribute name="socoro_total_docket_num" />
+        <attribute name="createdon" />
+        <attribute name="statecode" />
+    
+        <link-entity name="account" from="accountid" to="socoro_acct_id" link-type="inner" alias="ja">
+            <attribute name="name" />
+        </link-entity>
+
+        <filter type="and">
+            {% if filterByTitle %}
+                <filter type="or">
+                    <condition attribute="socoro_name" operator="like" value="%{{ filterByTitle }}%" />
+                    <condition attribute="socoro_po_num" operator="like" value="%{{ filterByTitle }}%" />
+                    <condition attribute="name" operator="like" entityname='ja' value="%{{ filterByTitle }}%" />
+                    {% if capacity > 0 %}
+                    <condition attribute="socoro_total_docket_num" operator="eq" value="{{ capacity }}" />
+                    <condition attribute="socoro_total_ton" operator="eq" value="{{ capacity }}" />
+                    {% endif %}
+                </filter>
+            {% endif %}
+
+            {% if filterByType and includeArc %}
+                <filter type="or">
+                    {% for types in orderTypes %}
+                        <condition attribute="socoro_ordertype" operator="eq" value="{{ types }}" />
+                    {% endfor %}
+                    <condition attribute="statecode" operator="eq" value="1" />
+                </filter>
+            {% elsif filterByType %}
+                <filter type="or">
+                    {% for types in orderTypes %}
+                        <condition attribute="socoro_ordertype" operator="eq" value="{{ types }}" />
+                    {% endfor %}
+                </filter>
+            {% elsif includeArc %}
+                <condition attribute="statecode" operator="eq" value="1" />
+            {% else %}
+                <condition attribute="statecode" operator="eq" value="0" />            
+            {% endif %}
+
+            {% if filterByTime and orderTimes.size == 2 %}
+                <filter type="and">
+                    <condition attribute="createdon" operator="on-or-after" value="{{ orderTimes[0] }}" />
+                    <condition attribute="createdon" operator="on-or-before" value="{{ orderTimes[1] }}" />
+                </filter>
+            {% endif %}
+
+            {% unless includeAll %}
+                <condition attribute="statecode" operator="eq" value="0">
+                </condition>
+            {% endunless %}
+
+        </filter>
+    </entity>
+</fetch>
+
+{% endfetchxml %}
+
+
+{% if getTotalJobs.results.entities.size > 0 %}
+  {
+    "ok": true,
+    "count": {{ getTotalJobs.results.entities.size }},
+    "morerecords": {{ getJobs.results.more_records }},
+    "page": {{ request.params['page'] | default: 1 }},
+    "results": [
+      {% for job in getJobs.results.entities %}
+        {
+          "guid": "{{ job.socoro_jobid }}",
+          "jobId": "{{ job.socoro_name | escape }}",
+          "jobName": "{{ job.socoro_job_name | escape }}",
+          "clientName": "{{ job['ja.name'] | escape }}",
+          "poNumber": "{{ job.socoro_po_num }}",
+          "orderTypeLabel": "{{ job.socoro_ordertype.label }}",
+          "orderTypeValue": "{{ job.socoro_ordertype.value }}",
+          "jobStatusLabel": "{{ job.socoro_jobstatus.label }}",
+          "jobStatusValue": "{{ job.socoro_jobstatus.value }}",
+          "totalTonnage": "{{ job.socoro_total_ton }}",
+          "remainingTonnage": "{{ job.socoro_total_remind_ton }}",
+          "value": "{{ job.socoro_total_value }}",
+          "deliveryAddress": "{{ job.socoro_dlv_addr | strip_newlines | escape }}",
+          "deliveryNote": "{{ job.socoro_dlv_note | strip_newlines | escape }}",
+          "numOfDockets": "{{ job.socoro_total_docket_num }}",
+          "createdOn": "{{ job.createdon | date_to_iso8601 }}",
+          "activeStatus": "{{ job.statecode.label}}"
+        }
+        {% unless forloop.last %},{% endunless %}
+      {% endfor %}
+    ]
+  }
+{% else %}
+  {
+    "ok": true,
+    "message": "No data found",
+    "results": []
+  }
+{% endif %}
